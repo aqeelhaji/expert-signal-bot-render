@@ -16,9 +16,12 @@ CHAT_ID = '230315107'
 bot = telebot.TeleBot(TOKEN)
 
 def send_signal(pair, signal):
-    message = f"📊 توصية جديدة لـ {pair}:
-✅ {signal}
-⏱️ نفّذ الصفقة بفريم 1:30 دقيقة"
+    message = (
+    f"📊 توصية جديدة لـ {pair}:\n"
+    f"✅ {signal}\n"
+    f"⏱️ نفّذ الصفقة بفريم 1:30 دقيقة"
+)
+
     bot.send_message(CHAT_ID, message)
     print(message)
 
