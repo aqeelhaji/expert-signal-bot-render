@@ -3,11 +3,12 @@ import requests
 import pandas as pd
 import telebot
 import datetime
+import time
 
 # إعدادات TwelveData API
 API_KEY = 'dd98455cbb9b4161b38d5d8e561b5f72'
-EURUSD_URL = f'https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=1min&apikey={API_KEY}&outputsize=100'
-GOLD_URL = f'https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=1min&apikey={API_KEY}&outputsize=100'
+EURUSD_URL = f'https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=30s&apikey={API_KEY}&outputsize=100'
+GOLD_URL = f'https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=30s&apikey={API_KEY}&outputsize=100'
 
 # إعدادات تيليجرام
 TOKEN = '7901371888:AAFxzcndqyccegYv9uVWAm4UnP1guO5AeME'
@@ -15,9 +16,9 @@ CHAT_ID = '230315107'
 bot = telebot.TeleBot(TOKEN)
 
 def send_signal(pair, signal):
-    message = f"""📊 توصية جديدة لـ {pair}:
+    message = f"📊 توصية جديدة لـ {pair}:
 ✅ {signal}
-⏱️ نفّذ الصفقة بفريم 1:30 دقيقة"""
+⏱️ نفّذ الصفقة بفريم 1:30 دقيقة"
     bot.send_message(CHAT_ID, message)
     print(message)
 
@@ -43,23 +44,42 @@ def calculate_indicators(df):
     df['macd_signal'] = df['macd'].ewm(span=9, adjust=False).mean()
     return df
 
-def analyze_market(pair):
-    url = EURUSD_URL if pair == 'EUR/USD' else GOLD_URL
-    response = requests.get(url)
-    data = response.json()
-    if 'values' not in data:
-        print(f"❌ فشل في جلب البيانات لـ {pair}")
+def analyze_market(pair, url):
+    try:
+        response = requests.get(url)
+        data = response.json()
+        if 'values' not in data:
+            print(f"❌ فشل في جلب البيانات لـ {pair}")
+            return None
+        df = pd.DataFrame(data['values'])
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        df = df.sort_values('datetime')
+        df = calculate_indicators(df)
+        latest = df.iloc[-1]
+        buy = latest['rsi'] < 30 and latest['close'] < latest['lower_band'] and latest['macd'] > latest['macd_signal']
+        sell = latest['rsi'] > 70 and latest['close'] > latest['upper_band'] and latest['macd'] < latest['macd_signal']
+        if buy:
+            return "شراء"
+        elif sell:
+            return "بيع"
+        else:
+            return None
+    except Exception as e:
+        print(f"⚠️ خطأ أثناء تحليل {pair}: {e}")
         return None
-    df = pd.DataFrame(data['values'])
-    df['datetime'] = pd.to_datetime(df['datetime'])
-    df = df.sort_values('datetime')
-    df = calculate_indicators(df)
-    latest = df.iloc[-1]
-    buy = latest['rsi'] < 30 and latest['close'] < latest['lower_band'] and latest['macd'] > latest['macd_signal']
-    sell = latest['rsi'] > 70 and latest['close'] > latest['upper_band'] and latest['macd'] < latest['macd_signal']
-    if buy:
-        return "شراء"
-    elif sell:
-        return "بيع"
-    else:
-        return None
+
+def run_bots():
+    last_status_hour = datetime.datetime.now().hour
+    while True:
+        now = datetime.datetime.now()
+        if now.hour != last_status_hour:
+            send_hourly_status()
+            last_status_hour = now.hour
+
+        for pair, url in [('EUR/USD', EURUSD_URL), ('GOLD', GOLD_URL)]:
+            signal = analyze_market(pair, url)
+            if signal:
+                send_signal(pair, signal)
+            else:
+                print(f"⏳ [{now.strftime('%H:%M:%S')}] {pair}: لا توجد توصية حالياً...")
+        time.sleep(30)
