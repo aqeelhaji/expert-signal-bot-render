@@ -1,36 +1,37 @@
-
+# signal_logic.py
 import requests
 import pandas as pd
 import telebot
 import datetime
 import time
 
-# Telegram Settings
-TOKEN = '7901371888:AAFxzcndqyccegYv9uVWAm4UnP1guO5AeME'
-CHAT_ID = '230315107'
-bot = telebot.TeleBot(TOKEN)
-
-# TwelveData API
+# إعدادات TwelveData API
 API_KEY = 'dd98455cbb9b4161b38d5d8e561b5f72'
 EURUSD_URL = f'https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=1min&apikey={API_KEY}&outputsize=100'
 GOLD_URL = f'https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=1min&apikey={API_KEY}&outputsize=100'
 
-last_hour_notified = None
+# إعدادات تيليجرام
+TOKEN = '7901371888:AAFxzcndqyccegYv9uVWAm4UnP1guO5AeME'
+CHAT_ID = '230315107'
+bot = telebot.TeleBot(TOKEN)
+
+last_hour_sent = None
 
 def send_signal(pair, signal):
-    message = f"📊 توصية جديدة لـ {pair}:
+    message = f"""📊 توصية جديدة لـ {pair}:
 ✅ {signal}
-⏱️ نفّذ الصفقة بفريم {'30 ثانية' if pair == 'EUR/USD' else '1:30 دقيقة'}"
+⏱️ نفّذ الصفقة بفريم 1:30 دقيقة"""
     bot.send_message(CHAT_ID, message)
     print(message)
 
 def send_hourly_status():
-    global last_hour_notified
+    global last_hour_sent
     now = datetime.datetime.now()
-    if not last_hour_notified or (now - last_hour_notified).seconds >= 3600:
-        last_hour_notified = now
-        status = f"⏱️ البوت يعمل ✅ الساعة الآن: {now.strftime('%H:%M:%S')}"
-        bot.send_message(CHAT_ID, status)
+    if last_hour_sent is None or (now - last_hour_sent).seconds >= 3600:
+        message = f"⏱️ البوت يعمل ✅ الساعة الآن: {now.strftime('%H:%M:%S')}"
+        bot.send_message(CHAT_ID, message)
+        last_hour_sent = now
+
 
 def calculate_indicators(df):
     df['close'] = df['close'].astype(float)
@@ -61,10 +62,8 @@ def analyze_market(pair):
     df = df.sort_values('datetime')
     df = calculate_indicators(df)
     latest = df.iloc[-1]
-
-    buy = (latest['rsi'] < 35 and latest['close'] < latest['lower_band']) or (latest['macd'] > latest['macd_signal'])
-    sell = (latest['rsi'] > 65 and latest['close'] > latest['upper_band']) or (latest['macd'] < latest['macd_signal'])
-
+    buy = latest['rsi'] < 30 and latest['close'] < latest['lower_band'] and latest['macd'] > latest['macd_signal']
+    sell = latest['rsi'] > 70 and latest['close'] > latest['upper_band'] and latest['macd'] < latest['macd_signal']
     if buy:
         return "شراء"
     elif sell:
@@ -80,7 +79,7 @@ def run_bots():
                 if signal:
                     send_signal(pair, signal)
                 else:
-                    print(f"⏳ {pair}: لا توجد توصية حالياً...")
+                    print(f"⏳ [{datetime.datetime.now().strftime('%H:%M:%S')}] {pair}: لا توجد توصية حالياً...")
             send_hourly_status()
         except Exception as e:
             print(f"⚠️ خطأ: {e}")
