@@ -23,13 +23,13 @@ bots = {
 }
 
 def send_signal(pair, signal, chat_id):
-    message = f"📊 توصية مؤكدة لـ {pair}:
+    message = f"""📊 توصية مؤكدة لـ {pair}:
 ✅ {signal}
-⏱️ نفّذ الصفقة بفريم 1:30 دقيقة"
+⏱️ نفّذ الصفقة بفريم 1:30 دقيقة"""
     bots[pair].send_message(chat_id, message)
 
 def send_possible(pair, signal, points_diff, chat_id):
-    message = f"⚠️ توصية محتملة لـ {pair}:
+    message = f"""⚠️ توصية محتملة لـ {pair}:
 🔄 الاتجاه: {signal}
 📍المتبقي لتحقيق الشرط الثالث: {points_diff:.4f} نقطة"
     bots[pair].send_message(chat_id, message)
